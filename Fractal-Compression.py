@@ -12,7 +12,7 @@ gene_size = 256
 population_size = 100
 generations = 24000
 
-fractal_iterations = 6
+fractal_iterations = 2
 window_size_sqrt = 3
 seed = 0
 
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     fig = plt.figure()
     plt.axis('off')
 
-    img = Image.open('Lena.png').convert("L")
+    img = Image.open('./Images/test.png').convert("L")
     target = np.asarray(img)
 
     population = np.zeros((population_size,gene_size,window_size_sqrt,window_size_sqrt))
@@ -85,7 +85,7 @@ if __name__ == '__main__':
         population[i] = init_windows()
 
     try:
-        with writer.saving(fig, "Lena.mp4",100):
+        with writer.saving(fig, "Test.mp4",100):
             for i in range(generations):
                 top = []
                 for j in range(population_size):
@@ -104,11 +104,16 @@ if __name__ == '__main__':
                 for j in range(population_size - 3,population_size):
                     population[j] = init_windows()
 
-                print("Generation: {}".format(i))
-                print("Top fitness: {}".format(top[0][0]))
+                new_fitness = top[0][0]
 
-                plt.imshow(decode(population[top[0][1]],fractal_iterations,seed),cmap='Greys_r',interpolation='nearest')
-                writer.grab_frame()
+                print("Generation: {}".format(i))
+                print("Top fitness: {}".format(new_fitness))
+
+                if(i==0 or new_fitness<old_fitness):
+                    old_fitness = new_fitness
+
+                    plt.imshow(decode(population[top[0][1]],fractal_iterations,seed),cmap='Greys_r',interpolation='nearest')
+                    writer.grab_frame()
 
     except KeyboardInterrupt:
         pass
