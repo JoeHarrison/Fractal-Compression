@@ -1,16 +1,18 @@
-from PIL import Image
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from PIL import Image
 
 #Hyper parameters
-mutation_rate = 0.05
+mutation_rate = 0.1
 crossover_rate = 0.5
 gene_size = 256
 population_size = 100
-generations = 10000
+generations = 24000
 
-fractal_iterations = 2
+fractal_iterations = 6
 window_size_sqrt = 3
 seed = 0
 
@@ -48,7 +50,8 @@ def mutate(windows,mutation_rate,gene_size,window_size_sqrt):
     mutated_windows = np.zeros((gene_size,window_size_sqrt,window_size_sqrt))
     for i in range(gene_size):
         random_matrix = np.random.choice([-1,0,1],(window_size_sqrt,window_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
-        mutated_windows[i] = np.clip(windows[i] + random_matrix,a_min=0,a_max=255)
+        ri = np.random.choice([1,2,3,4,5],1,[0.5,0.2,0.1,0.05,0.05])
+        mutated_windows[i] = np.clip(windows[i] + ri*random_matrix,a_min=0,a_max=255)
     return mutated_windows
 
 def crossover(windows1,windows2,crossover_rate):
@@ -66,7 +69,14 @@ def crossover(windows1,windows2,crossover_rate):
     return crossover_windows1, crossover_windows2
 
 if __name__ == '__main__':
-    img = Image.open('test.png').convert("L")
+    FFMpegWriter = animation.writers['ffmpeg']
+    metadata = dict(title='Fractal-Compression')
+    writer = FFMpegWriter(fps=24, metadata=metadata)
+
+    fig = plt.figure()
+    plt.axis('off')
+
+    img = Image.open('Lena.png').convert("L")
     target = np.asarray(img)
 
     population = np.zeros((population_size,gene_size,window_size_sqrt,window_size_sqrt))
@@ -75,32 +85,31 @@ if __name__ == '__main__':
         population[i] = init_windows()
 
     try:
-        for i in range(generations):
-            top = []
-            for j in range(population_size):
-                decoded = decode(population[j],fractal_iterations,seed)
-                top.append((fitness(decoded,target),j))
-            top = sorted(top, key=lambda tup: tup[0])
+        with writer.saving(fig, "Lena.mp4",100):
+            for i in range(generations):
+                top = []
+                for j in range(population_size):
+                    decoded = decode(population[j],fractal_iterations,seed)
+                    top.append((fitness(decoded,target),j))
+                top = sorted(top, key=lambda tup: tup[0])
 
-            population[0] = population[top[0][1]]
+                population[0] = population[top[0][1]]
 
-            for j in range(1,population_size - 3):
-                population[j] = mutate(population[top[j][1]],mutation_rate,gene_size,window_size_sqrt)
+                for j in range(1,population_size - 3):
+                    population[j] = mutate(population[top[j][1]],mutation_rate,gene_size,window_size_sqrt)
 
-            for j in range(1,population_size - 3,2):
-                population[j], population[j+1] = crossover(population[j-1],population[j],crossover_rate)
+                for j in range(1,population_size - 3,2):
+                    population[j], population[j+1] = crossover(population[j-1],population[j],crossover_rate)
 
-            for j in range(population_size - 3,population_size):
-                population[j] = init_windows()
+                for j in range(population_size - 3,population_size):
+                    population[j] = init_windows()
 
-            print("Generation: {}".format(i))
-            print("Top fitness: {}".format(top[0][0]))
+                print("Generation: {}".format(i))
+                print("Top fitness: {}".format(top[0][0]))
+
+                plt.imshow(decode(population[top[0][1]],fractal_iterations,seed),cmap='Greys_r',interpolation='nearest')
+                writer.grab_frame()
 
     except KeyboardInterrupt:
         pass
 
-    decoded = decode(population[top[0][1]],4,seed)
-    img = Image.fromarray(decoded)
-    img.show()
-    img2 = Image.fromarray(target)
-    img2.show()
