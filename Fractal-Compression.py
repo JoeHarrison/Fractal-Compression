@@ -28,27 +28,28 @@ import os.path
 gene_size = 256
 population_size = 50
 mutation_rate = 2/population_size
-crossover_rate = 1/population_size
+crossover_rate = 2/population_size
 generations = 24000
 
-fractal_iterations = 3
+fractal_iterations = 2
 rule_size_sqrt = 3
 dimensions = 3
 seed = 100
 elites = 1
-randoms = 1
+randoms = 5
 
-target_image = './Images/Hand.png'
-video_file = 'fname.mp4'
+target_image = './Images/small.png'
+video_file = 'small.mp4'
 
-start_from_saved_file = False
+start_from_saved_file = True
+save_ruleset = True
 
 #Initalisation of rules
 #Every possible pixel value maps to a random 3x3 grid
 def init_rules():
-    rules = np.zeros((gene_size,rule_size_sqrt,rule_size_sqrt))
+    rules = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
     for i in range(gene_size):
-        rules[i] = np.random.randint(gene_size,size=(rule_size_sqrt,rule_size_sqrt))
+        rules[i] = np.random.randint(gene_size,size=(dimensions,rule_size_sqrt,rule_size_sqrt))
     return rules
 
 ruleset = np.array([[[11,25,25],[3,6,12],[16,15,11]],[[26,26,28],[25,27,29],[28,29,29]]
@@ -81,53 +82,79 @@ ruleset = np.array([[[11,25,25],[3,6,12],[16,15,11]],[[26,26,28],[25,27,29],[28,
 ,[[3,15,10], [22,7,29], [5,22,7]]
 ,[[1,1,3], [1,1,2], [1,1,3]]])
 
+ruleset = np.repeat(np.expand_dims(ruleset, axis=1),3,axis=1)
+
+
+
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
 def decode(rules,fractal_iterations,seed):
-    seed_matrix = np.array([[seed]])
+    #Keep using numpy if possible.
+    seed_matrix = [np.array([[seed]]),np.array([[seed]]),np.array([[seed]])]
 
-    for i in range(fractal_iterations):
-        size_y = seed_matrix.shape[0]
-        size_x = seed_matrix.shape[1]
-        new_matrix = np.zeros((size_y*rule_size_sqrt,size_x*rule_size_sqrt))
+    for i in range(dimensions):
+        for j in range(fractal_iterations):
 
-        for i in range(size_y):
-            for j in range(size_x):
-                seed_value = seed_matrix[i,j]
-                new_matrix[i*rule_size_sqrt : i*rule_size_sqrt+rule_size_sqrt, j*rule_size_sqrt : j*rule_size_sqrt+rule_size_sqrt] = rules[int(seed_value)]
-        seed_matrix = new_matrix
+            size_y = seed_matrix[i].shape[0]
+            size_x = seed_matrix[i].shape[1]
+            new_matrix = np.zeros((size_y*rule_size_sqrt,size_x*rule_size_sqrt))
 
-    return seed_matrix
+            for y in range(size_y):
+                for x in range(size_x):
+                    seed_value = seed_matrix[i][y,x]
+                    new_matrix[y*rule_size_sqrt : y*rule_size_sqrt+rule_size_sqrt, x*rule_size_sqrt : x*rule_size_sqrt+rule_size_sqrt] = rules[int(seed_value),i]
+
+            seed_matrix[i] = new_matrix
+
+    #Image needs to be reshaped to (n,m,3) instead of (3,n,m)
+    return np.array(seed_matrix).reshape((np.array(seed_matrix).shape[1], np.array(seed_matrix).shape[2],3))
 
 #The the sum of the pixel-wise absolute differences between the target image and the image created using the rule set is used as fitness measure. A sum of 0 means that the target image could be recreated from the rule set without loss. The largest possible difference is the gene size x height x width of the image.
 def fitness(target_image,genetic_image):
-    difference = np.subtract(target_image,genetic_image)
-    square = np.square(difference)
-    sum = np.sum(square)
+    penalty = 0
 
-    return sum
+    for i in range(dimensions):
+        difference = np.subtract(target_image[i],genetic_image[i])
+        square = np.square(difference)
+        penalty += np.sum(square)
+
+    return penalty
 
 #Each pixel is mutated with a mutation_rate/2 chance.
 #The range is clipped to a minimum of 0 and a maximum of gene size.
 def mutate(rules,mutation_rate,gene_size,rule_size_sqrt):
-    mutated_rules = np.zeros((gene_size,rule_size_sqrt,rule_size_sqrt))
+    mutated_rules = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
     for i in range(gene_size):
-        random_matrix = np.random.choice([-1,0,1],(rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
+        random_matrix = np.random.choice([-1,0,1],(dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
         mutated_rules[i] = np.clip(rules[i] + random_matrix,a_min=0,a_max=255)
     return mutated_rules
 
+def crossover_v2(rules1,rules2,crossover_rate):
+    crossover_rules1 = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+    crossover_rules2 = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+    for i in range(gene_size):
+        for j in range(dimensions):
+            mask = np.random.choice([0,1],size=(rule_size_sqrt,rule_size_sqrt),p=[1-crossover_rate,crossover_rate])
+            ones = np.ones((rule_size_sqrt,rule_size_sqrt))
+            inverted_mask = np.subtract(ones,mask)
+            crossover_rules1[i,j] = np.ma.masked_array(rules1[i,j],mask) + np.ma.masked_array(rules2[i,j],inverted_mask)
+            crossover_rules2[i,j] = np.ma.masked_array(rules2[i,j],mask) + np.ma.masked_array(rules1[i,j],inverted_mask)
+
+    return crossover_rules1, crossover_rules2
+
 #Each rule in the rule sets is crossover at the crossover rate.
 def crossover(rules1,rules2,crossover_rate):
-    crossover_rules1 = np.zeros((gene_size,rule_size_sqrt,rule_size_sqrt))
-    crossover_rules2 = np.zeros((gene_size,rule_size_sqrt,rule_size_sqrt))
+    crossover_rules1 = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+    crossover_rules2 = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
     for i in range(gene_size):
-        randi = np.random.choice([0,1],p=[1-crossover_rate,crossover_rate])
-        if(randi):
-            crossover_rules1[i] = rules2[i]
-            crossover_rules2[i] = rules1[i]
-        else:
-            crossover_rules1[i] = rules1[i]
-            crossover_rules2[i] = rules2[i]
+        for j in range(dimensions):
+            randi = np.random.choice([0,1],p=[1-crossover_rate,crossover_rate])
+            if(randi):
+                crossover_rules1[i,j] = rules2[i,j]
+                crossover_rules2[i,j] = rules1[i,j]
+            else:
+                crossover_rules1[i,j] = rules1[i,j]
+                crossover_rules2[i,j] = rules2[i,j]
 
     return crossover_rules1, crossover_rules2
 
@@ -139,13 +166,13 @@ if __name__ == '__main__':
     fig = plt.figure()
     plt.axis('off')
 
-    img = Image.open(target_image).convert("L")
-    target = np.asarray(img)
+    img = Image.open(target_image)
+    target = np.asarray(img)[:,:,:dimensions]
 
     if(os.path.isfile('Hand.npy') and start_from_saved_file):
         population = np.load('Hand.npy')
     else:
-        population = np.zeros((population_size,gene_size,rule_size_sqrt,rule_size_sqrt))
+        population = np.zeros((population_size,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
 
         for i in range(population_size):
             population[i] = init_rules()
@@ -204,6 +231,8 @@ if __name__ == '__main__':
         total_frames = len(writepops)
         for idx, wrtpop in enumerate(writepops):
             print("{}/{}".format(idx,total_frames))
-            plt.imshow(wrtpop,cmap='Greys_r',interpolation='nearest')
+            plt.imshow(wrtpop,interpolation='nearest')
             writer.grab_frame()
-    np.save('Hand',population)
+
+    if(save_ruleset):
+        np.save('Hand',population)
