@@ -47,6 +47,36 @@ def init_rules():
         rules[i] = np.random.randint(gene_size,size=(rule_size_sqrt,rule_size_sqrt))
     return rules
 
+ruleset = np.array([[[11,25,25],[3,6,12],[16,15,11]],[[26,26,28],[25,27,29],[28,29,29]]
+,[[28,28,29],[22,26,26],[29,29,28]]
+,[[22,29,24],[29,29,24],[29,22,21]]
+,[[28,29,24],[28,26,29],[29,26,17]]
+,[[0,0,2],[8,2,2],[1,3,2]]
+,[[23,7,8],[18,29,12],[16,22,12]]
+,[[2,2,1],[2,1,2],[1,3,1]]
+,[[19,13,22],[24,18,22],[1,27,29]]
+,[[0,8,23], [11,7,28], [1,5,2]]
+,[[22,29,26], [27,15,19], [25,21,10]]
+,[[16,17,1], [1,21,10], [13,5,29]]
+,[[23,29,29], [23,29,29], [18,29,29]]
+,[[27,27,29], [26,22,15], [24,12,24]]
+,[[14,28,29], [28,28,14], [29,23,19]]
+,[[16,7,12], [7,7,24], [29,7,29]]
+,[[22,8,21], [29,21,21], [29,13,10]]
+,[[4,23,23], [2,24,13], [23,0,16]]
+,[[5,17,1], [27,8,2], [5,25,1]]
+,[[25,25,15], [19,29,29], [19,28,21]]
+,[[1,5,0], [1,6,2], [3,0,2]]
+,[[27,27,20], [22,22,27], [29,22,28]]
+,[[1,1,1], [4,3,2], [3,2,2]]
+,[[29,27,24], [29,28,24], [29,26,24]]
+,[[21,25,27], [23,28,27], [19,28,29]]
+,[[28,28,28], [21,13,26], [3,7,27]]
+,[[5,22,20], [15,22,15], [24,14,22]]
+,[[1,3,2], [2,1,7], [3,2,0]]
+,[[3,15,10], [22,7,29], [5,22,7]]
+,[[1,1,3], [1,1,2], [1,1,3]]])
+
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
 def decode(rules,fractal_iterations,seed):
@@ -135,16 +165,16 @@ if __name__ == '__main__':
                 odds.append(top[j][0] / total_fitness)
 
             old_population = population
-		
+
             for j in range(elites):
                 population[j] = population[top_sorted[j][1]]
 
             for j in range(elites,population_size):
-                population[j] = mutate(population[j],mutation_rate,gene_size,rule_size_sqrt)       
-                
+                population[j] = mutate(population[j],mutation_rate,gene_size,rule_size_sqrt)
+
             for j in range(elites,population_size):
                random_pop = np.random.choice(population_size,1,odds)
-               population[j] = old_population[random_pop]    
+               population[j] = old_population[random_pop]
 
             for j in range(elites,population_size - randoms,2):
                 random_indices = np.random.choice(population_size,2,odds)
@@ -161,12 +191,15 @@ if __name__ == '__main__':
             if(i==0 or new_fitness<old_fitness):
                 old_fitness = new_fitness
                 writepops.append(decode(population[0],fractal_iterations,seed))
-                    
+
 
     except KeyboardInterrupt:
-        with writer.saving(fig, "Hand.mp4",100):
-            for wrtpop in writepops:
-                plt.imshow(wrtpop,cmap='Greys_r',interpolation='nearest')
-                writer.grab_frame()
-        np.save('Hand',population)
         pass
+
+    with writer.saving(fig, "Hand.mp4",100):
+        total_frames = len(writepops)
+        for idx, wrtpop in enumerate(writepops):
+            print("{}/{}".format(idx,total_frames))
+            plt.imshow(wrtpop,cmap='Greys_r',interpolation='nearest')
+            writer.grab_frame()
+    np.save('Hand',population)
