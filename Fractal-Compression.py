@@ -25,17 +25,21 @@ import os.path
 # - Make functions from main
 
 #Hyper parameters
-mutation_rate = 0.01
-crossover_rate = 0.1
 gene_size = 256
-population_size = 20
+population_size = 50
+mutation_rate = 2/population_size
+crossover_rate = 1/population_size
 generations = 24000
 
 fractal_iterations = 3
 rule_size_sqrt = 3
+dimensions = 3
 seed = 100
 elites = 1
 randoms = 1
+
+target_image = './Images/Hand.png'
+video_file = 'fname.mp4'
 
 start_from_saved_file = False
 
@@ -98,8 +102,8 @@ def decode(rules,fractal_iterations,seed):
 #The the sum of the pixel-wise absolute differences between the target image and the image created using the rule set is used as fitness measure. A sum of 0 means that the target image could be recreated from the rule set without loss. The largest possible difference is the gene size x height x width of the image.
 def fitness(target_image,genetic_image):
     difference = np.subtract(target_image,genetic_image)
-    abs = np.abs(difference)
-    sum = np.sum(abs)
+    square = np.square(difference)
+    sum = np.sum(square)
 
     return sum
 
@@ -135,7 +139,7 @@ if __name__ == '__main__':
     fig = plt.figure()
     plt.axis('off')
 
-    img = Image.open('./Images/Hand.png').convert("L")
+    img = Image.open(target_image).convert("L")
     target = np.asarray(img)
 
     if(os.path.isfile('Hand.npy') and start_from_saved_file):
@@ -196,7 +200,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
 
-    with writer.saving(fig, "Hand.mp4",100):
+    with writer.saving(fig, video_file ,100):
         total_frames = len(writepops)
         for idx, wrtpop in enumerate(writepops):
             print("{}/{}".format(idx,total_frames))
