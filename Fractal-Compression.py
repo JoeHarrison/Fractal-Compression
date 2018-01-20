@@ -24,11 +24,14 @@ import os.path
 # - Elitism
 # - Make functions from main
 
+#You're doing something wrong!!! top half correct??
+#Try 0 seed and rule[0] and do 1 fractal_iterations
+
 #Hyper parameters
 gene_size = 256
 population_size = 50
-mutation_rate = 2/population_size
-crossover_rate = 2/population_size
+mutation_rate = 0.1
+crossover_rate = 0.1
 generations = 24000
 
 fractal_iterations = 2
@@ -51,6 +54,8 @@ def init_rules():
     for i in range(gene_size):
         rules[i] = np.random.randint(gene_size,size=(dimensions,rule_size_sqrt,rule_size_sqrt))
     return rules
+
+ruleset2 = np.array([[[[[1,2,3],[4,5,6],[7,8,9]]],[[[10,11,12],[13,14,15],[16,17,18]]],[[[19,20,21],[22,23,24],[25,26,27]]]]])
 
 ruleset = np.array([[[11,25,25],[3,6,12],[16,15,11]],[[26,26,28],[25,27,29],[28,29,29]]
 ,[[28,28,29],[22,26,26],[29,29,28]]
@@ -82,9 +87,7 @@ ruleset = np.array([[[11,25,25],[3,6,12],[16,15,11]],[[26,26,28],[25,27,29],[28,
 ,[[3,15,10], [22,7,29], [5,22,7]]
 ,[[1,1,3], [1,1,2], [1,1,3]]])
 
-ruleset = np.repeat(np.expand_dims(ruleset, axis=1),3,axis=1)
-
-
+#ruleset = np.repeat(np.expand_dims(ruleset, axis=1),3,axis=1)
 
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
@@ -105,9 +108,20 @@ def decode(rules,fractal_iterations,seed):
                     new_matrix[y*rule_size_sqrt : y*rule_size_sqrt+rule_size_sqrt, x*rule_size_sqrt : x*rule_size_sqrt+rule_size_sqrt] = rules[int(seed_value),i]
 
             seed_matrix[i] = new_matrix
-
+            #place here?
     #Image needs to be reshaped to (n,m,3) instead of (3,n,m)
-    return np.array(seed_matrix).reshape((np.array(seed_matrix).shape[1], np.array(seed_matrix).shape[2],3))
+    return np.moveaxis(seed_matrix,0,-1)
+    #return np.array(seed_matrix).reshape((np.array(seed_matrix).shape[1], np.array(seed_matrix).shape[2],3))
+
+# print('---decode---')
+# print(decode(ruleset2,1,0))
+# im = Image.fromarray(decode(ruleset2,1,0),'RGB')
+# im.save('im.png')
+# img = Image.open('im.png')
+# print(np.asarray(img))
+# target = np.asarray(img)[:,:,:dimensions]
+# print(target)
+# print('------------')
 
 #The the sum of the pixel-wise absolute differences between the target image and the image created using the rule set is used as fitness measure. A sum of 0 means that the target image could be recreated from the rule set without loss. The largest possible difference is the gene size x height x width of the image.
 def fitness(target_image,genetic_image):
@@ -127,6 +141,17 @@ def mutate(rules,mutation_rate,gene_size,rule_size_sqrt):
     for i in range(gene_size):
         random_matrix = np.random.choice([-1,0,1],(dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
         mutated_rules[i] = np.clip(rules[i] + random_matrix,a_min=0,a_max=255)
+    return mutated_rules
+
+#Each pixel is mutated with a random value between 0 and 255
+def mutate_v2(rules,mutation_rate,gene_size,rule_size_sqrt):
+    mutated_rules = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+    for i in range(gene_size):
+        mask = np.random.choice([0,1],(dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate,1-mutation_rate])
+        ones = np.ones((dimensions,rule_size_sqrt,rule_size_sqrt))
+        inverted_mask = np.subtract(ones,mask)
+        random_mask = np.ma.masked_array(np.random.randint(0,256,size=(dimensions,rule_size_sqrt,rule_size_sqrt)),mask)
+        mutated_rules[i] = np.ma.masked_array(rules[i],inverted_mask) + random_mask
     return mutated_rules
 
 def crossover_v2(rules1,rules2,crossover_rate):
