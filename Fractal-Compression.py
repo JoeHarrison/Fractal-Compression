@@ -27,16 +27,16 @@ import os.path
 #Hyper parameters
 gene_size = 256
 population_size = 50
-mutation_rate = 2/population_size
-crossover_rate = 2/population_size
+mutation_rate = 0.1
+crossover_rate = 0.2
 generations = 24000
+elites = 1
+randoms = 5
 
 fractal_iterations = 2
 rule_size_sqrt = 3
 dimensions = 3
-seed = 100
-elites = 1
-randoms = 5
+seed = 0
 
 target_image = './Images/small.png'
 video_file = 'small.mp4'
@@ -83,8 +83,6 @@ ruleset = np.array([[[11,25,25],[3,6,12],[16,15,11]],[[26,26,28],[25,27,29],[28,
 ,[[1,1,3], [1,1,2], [1,1,3]]])
 
 ruleset = np.repeat(np.expand_dims(ruleset, axis=1),3,axis=1)
-
-
 
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
