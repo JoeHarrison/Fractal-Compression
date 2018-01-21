@@ -1,7 +1,7 @@
 #Imports
 import numpy as np
 import matplotlib
-matplotlib.use("Agg")
+#matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from PIL import Image
@@ -34,15 +34,15 @@ mutation_rate = 0.1
 crossover_rate = 0.1
 generations = 24000
 
-fractal_iterations = 2
+fractal_iterations = 1
 rule_size_sqrt = 3
 dimensions = 3
 seed = 100
-elites = 1
+elites = 5
 randoms = 5
 
-target_image = './Images/small.png'
-video_file = 'small.mp4'
+target_image = './Images/lelijk.png'
+video_file = 'lelijk.mp4'
 
 start_from_saved_file = True
 save_ruleset = True
@@ -126,12 +126,10 @@ def decode(rules,fractal_iterations,seed):
 #The the sum of the pixel-wise absolute differences between the target image and the image created using the rule set is used as fitness measure. A sum of 0 means that the target image could be recreated from the rule set without loss. The largest possible difference is the gene size x height x width of the image.
 def fitness(target_image,genetic_image):
     penalty = 0
-
     for i in range(dimensions):
-        difference = np.subtract(target_image[i],genetic_image[i])
+        difference = np.subtract(target_image[:,:,i],genetic_image[:,:,i])
         square = np.square(difference)
         penalty += np.sum(square)
-
     return penalty
 
 #Each pixel is mutated with a mutation_rate/2 chance.
@@ -194,8 +192,8 @@ if __name__ == '__main__':
     img = Image.open(target_image)
     target = np.asarray(img)[:,:,:dimensions]
 
-    if(os.path.isfile('Hand.npy') and start_from_saved_file):
-        population = np.load('Hand.npy')
+    if(os.path.isfile('Lelijk.npy') and start_from_saved_file):
+        population = np.load('Lelijk.npy')
     else:
         population = np.zeros((population_size,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
 
@@ -210,7 +208,7 @@ if __name__ == '__main__':
             total_fitness = 0
             for j in range(population_size):
                 decoded = decode(population[j],fractal_iterations,seed)
-                decoded_fitness = fitness(decoded,target)
+                decoded_fitness = fitness(target,decoded)
                 total_fitness += decoded_fitness
                 top.append((decoded_fitness,j))
             top_sorted = sorted(top, key=lambda tup: tup[0])
@@ -248,7 +246,6 @@ if __name__ == '__main__':
                 old_fitness = new_fitness
                 writepops.append(decode(population[0],fractal_iterations,seed))
 
-
     except KeyboardInterrupt:
         pass
 
@@ -256,8 +253,9 @@ if __name__ == '__main__':
         total_frames = len(writepops)
         for idx, wrtpop in enumerate(writepops):
             print("{}/{}".format(idx,total_frames))
-            plt.imshow(wrtpop,interpolation='nearest')
+
+            plt.imshow(target.astype('uint8'),interpolation='nearest')
             writer.grab_frame()
 
     if(save_ruleset):
-        np.save('Hand',population)
+        np.save('Lelijk',population)
