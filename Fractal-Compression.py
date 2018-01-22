@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from PIL import Image
 import os.path
+import os
+
 
 #TODO
 # - vary seed in genes
@@ -24,25 +26,22 @@ import os.path
 # - Elitism
 # - Make functions from main
 
-#You're doing something wrong!!! top half correct??
-#Try 0 seed and rule[0] and do 1 fractal_iterations
-
 #Hyper parameters
 gene_size = 256
 population_size = 50
-mutation_rate = 0.1
-crossover_rate = 0.1
+mutation_rate = 0.1/5
+crossover_rate = 0.1/5
 generations = 24000
-elites = 1
+elites = 2
 randoms = 5
 
-fractal_iterations = 1
+fractal_iterations = 3
 rule_size_sqrt = 3
 dimensions = 3
-seed = 0
+seed = 100
 
-target_image = './Images/lelijk.png'
-video_file = 'lelijk.mp4'
+target_image = './Images/Hand.png'
+video_file = 'hand.mp4'
 
 start_from_saved_file = True
 save_ruleset = True
@@ -54,40 +53,6 @@ def init_rules():
     for i in range(gene_size):
         rules[i] = np.random.randint(gene_size,size=(dimensions,rule_size_sqrt,rule_size_sqrt))
     return rules
-
-ruleset2 = np.array([[[[[1,2,3],[4,5,6],[7,8,9]]],[[[10,11,12],[13,14,15],[16,17,18]]],[[[19,20,21],[22,23,24],[25,26,27]]]]])
-
-ruleset = np.array([[[11,25,25],[3,6,12],[16,15,11]],[[26,26,28],[25,27,29],[28,29,29]]
-,[[28,28,29],[22,26,26],[29,29,28]]
-,[[22,29,24],[29,29,24],[29,22,21]]
-,[[28,29,24],[28,26,29],[29,26,17]]
-,[[0,0,2],[8,2,2],[1,3,2]]
-,[[23,7,8],[18,29,12],[16,22,12]]
-,[[2,2,1],[2,1,2],[1,3,1]]
-,[[19,13,22],[24,18,22],[1,27,29]]
-,[[0,8,23], [11,7,28], [1,5,2]]
-,[[22,29,26], [27,15,19], [25,21,10]]
-,[[16,17,1], [1,21,10], [13,5,29]]
-,[[23,29,29], [23,29,29], [18,29,29]]
-,[[27,27,29], [26,22,15], [24,12,24]]
-,[[14,28,29], [28,28,14], [29,23,19]]
-,[[16,7,12], [7,7,24], [29,7,29]]
-,[[22,8,21], [29,21,21], [29,13,10]]
-,[[4,23,23], [2,24,13], [23,0,16]]
-,[[5,17,1], [27,8,2], [5,25,1]]
-,[[25,25,15], [19,29,29], [19,28,21]]
-,[[1,5,0], [1,6,2], [3,0,2]]
-,[[27,27,20], [22,22,27], [29,22,28]]
-,[[1,1,1], [4,3,2], [3,2,2]]
-,[[29,27,24], [29,28,24], [29,26,24]]
-,[[21,25,27], [23,28,27], [19,28,29]]
-,[[28,28,28], [21,13,26], [3,7,27]]
-,[[5,22,20], [15,22,15], [24,14,22]]
-,[[1,3,2], [2,1,7], [3,2,0]]
-,[[3,15,10], [22,7,29], [5,22,7]]
-,[[1,1,3], [1,1,2], [1,1,3]]])
-
-#ruleset = np.repeat(np.expand_dims(ruleset, axis=1),3,axis=1)
 
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
@@ -112,16 +77,6 @@ def decode(rules,fractal_iterations,seed):
     #Image needs to be reshaped to (n,m,3) instead of (3,n,m)
     return np.moveaxis(seed_matrix,0,-1)
     #return np.array(seed_matrix).reshape((np.array(seed_matrix).shape[1], np.array(seed_matrix).shape[2],3))
-
-# print('---decode---')
-# print(decode(ruleset2,1,0))
-# im = Image.fromarray(decode(ruleset2,1,0),'RGB')
-# im.save('im.png')
-# img = Image.open('im.png')
-# print(np.asarray(img))
-# target = np.asarray(img)[:,:,:dimensions]
-# print(target)
-# print('------------')
 
 #The the sum of the pixel-wise absolute differences between the target image and the image created using the rule set is used as fitness measure. A sum of 0 means that the target image could be recreated from the rule set without loss. The largest possible difference is the gene size x height x width of the image.
 def fitness(target_image,genetic_image):
@@ -181,6 +136,39 @@ def crossover(rules1,rules2,crossover_rate):
 
     return crossover_rules1, crossover_rules2
 
+def read_rules(file_name):
+    print('Reading: {}'.format(file_name))
+    with open(file_name, 'r') as f:
+        seed = int(f.readline())
+        gene_size = int(f.readline())
+        dimensions = int(f.readline())
+
+        rules = np.zeros((gene_size,dimensions,3,3))
+        for i in range(dimensions):
+            for j in range(gene_size):
+                line = f.readline().split(" ")
+                idx = 0
+                for k in range(3):
+                    for l in range(3):
+                        rules[j,i,k,l] = float(line[idx])
+                        idx +=1
+    return rules
+
+def write_rules(file_name,rules,seed,gene_size,dimensions):
+    print('Writing: {}'.format(file_name))
+    os.remove(file_name)
+    with open(file_name, 'a') as f:
+        f.write(str(seed) + '\n')
+        f.write(str(gene_size) + '\n')
+        f.write(str(dimensions) + '\n')
+        for rule in rules:
+            for i in range(rules.shape[1]):
+                for j in range(rules.shape[0]):
+                    for k in range(rules.shape[2]):
+                        for l in range(rules.shape[3]):
+                            f.write(str(int(rules[j,i,k,l])) + ' ')
+                    f.write('\n')
+
 if __name__ == '__main__':
     FFMpegWriter = animation.writers['ffmpeg']
     metadata = dict(title='Fractal-Compression')
@@ -192,8 +180,8 @@ if __name__ == '__main__':
     img = Image.open(target_image)
     target = np.asarray(img)[:,:,:dimensions]
 
-    if(os.path.isfile('Lelijk.npy') and start_from_saved_file):
-        population = np.load('Lelijk.npy')
+    if(os.path.isfile('hand.npy') and start_from_saved_file):
+        population = np.load('hand.npy')
     else:
         population = np.zeros((population_size,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
 
@@ -240,7 +228,7 @@ if __name__ == '__main__':
             new_fitness = top_sorted[0][0]
 
             print("Generation: {}".format(i))
-            print("Top fitness: {}".format(new_fitness))
+            print("Top fitness: {},  {}".format(new_fitness,np.sqrt(new_fitness)))
 
             if(i==0 or new_fitness<old_fitness):
                 old_fitness = new_fitness
@@ -254,8 +242,8 @@ if __name__ == '__main__':
         for idx, wrtpop in enumerate(writepops):
             print("{}/{}".format(idx,total_frames))
 
-            plt.imshow(target.astype('uint8'),interpolation='nearest')
+            plt.imshow(wrtpop.astype('uint8'),interpolation='nearest')
             writer.grab_frame()
 
     if(save_ruleset):
-        np.save('Lelijk',population)
+        np.save('hand',population)
