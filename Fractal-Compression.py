@@ -7,9 +7,11 @@ import matplotlib.animation as animation
 from PIL import Image
 import os.path
 import os
+import time
 
 
 #TODO
+# - vary gene_size / turn on off genes
 # - vary seed in genes
 # - Allow for gene of different size?
 # - non-random initalisation
@@ -25,23 +27,24 @@ import os
 # - Comments
 # - Elitism
 # - Make functions from main
+# - Speed up decoder
 
 #Hyper parameters
 gene_size = 256
 population_size = 50
-mutation_rate = 0.1/5
-crossover_rate = 0.1/5
+mutation_rate = 0.1
+crossover_rate = 0.1
 generations = 24000
-elites = 2
-randoms = 5
+elites = 4
+randoms = 0
 
-fractal_iterations = 3
+fractal_iterations = 6
 rule_size_sqrt = 3
 dimensions = 3
 seed = 100
 
-target_image = './Images/Hand.png'
-video_file = 'hand.mp4'
+target_image = './Images/pi.png'
+video_file = 'pi.mp4'
 
 start_from_saved_file = True
 save_ruleset = True
@@ -57,30 +60,29 @@ def init_rules():
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
 def decode(rules,fractal_iterations,seed):
-    #Keep using numpy if possible.
-    seed_matrix = [np.array([[seed]]),np.array([[seed]]),np.array([[seed]])]
+    final_seed_matrix = np.zeros((3,3**fractal_iterations,3**fractal_iterations))
 
     for i in range(dimensions):
+        seed_matrix = np.array([[seed]])
         for j in range(fractal_iterations):
-
-            size_y = seed_matrix[i].shape[0]
-            size_x = seed_matrix[i].shape[1]
+            size_y = seed_matrix.shape[0]
+            size_x = seed_matrix.shape[1]
             new_matrix = np.zeros((size_y*rule_size_sqrt,size_x*rule_size_sqrt))
 
             for y in range(size_y):
                 for x in range(size_x):
-                    seed_value = seed_matrix[i][y,x]
+                    seed_value = seed_matrix[y,x]
                     new_matrix[y*rule_size_sqrt : y*rule_size_sqrt+rule_size_sqrt, x*rule_size_sqrt : x*rule_size_sqrt+rule_size_sqrt] = rules[int(seed_value),i]
 
-            seed_matrix[i] = new_matrix
-            #place here?
-    #Image needs to be reshaped to (n,m,3) instead of (3,n,m)
-    return np.moveaxis(seed_matrix,0,-1)
-    #return np.array(seed_matrix).reshape((np.array(seed_matrix).shape[1], np.array(seed_matrix).shape[2],3))
+            seed_matrix = new_matrix
+        final_seed_matrix[i] = seed_matrix
+
+    return np.moveaxis(final_seed_matrix,0,-1)
 
 #The the sum of the pixel-wise absolute differences between the target image and the image created using the rule set is used as fitness measure. A sum of 0 means that the target image could be recreated from the rule set without loss. The largest possible difference is the gene size x height x width of the image.
 def fitness(target_image,genetic_image):
     penalty = 0
+    #Faster to keep like this instead of using np.subtract on all dimensions
     for i in range(dimensions):
         difference = np.subtract(target_image[:,:,i],genetic_image[:,:,i])
         square = np.square(difference)
@@ -90,11 +92,15 @@ def fitness(target_image,genetic_image):
 #Each pixel is mutated with a mutation_rate/2 chance.
 #The range is clipped to a minimum of 0 and a maximum of gene size.
 def mutate(rules,mutation_rate,gene_size,rule_size_sqrt):
-    mutated_rules = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
-    for i in range(gene_size):
-        random_matrix = np.random.choice([-1,0,1],(dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
-        mutated_rules[i] = np.clip(rules[i] + random_matrix,a_min=0,a_max=255)
-    return mutated_rules
+    # mutated_rules = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+    # for i in range(gene_size):
+    #     random_matrix = np.random.choice([-1,0,1],(dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
+    #     mutated_rules[i] = np.clip(rules[i] + random_matrix,a_min=0,a_max=255)
+    # return mutated_rules
+
+    random_matrix = np.random.choice([-1,0,1],(gene_size,dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
+
+    return np.clip(rules + random_matrix,a_min=0,a_max=255)
 
 #Each pixel is mutated with a random value between 0 and 255
 def mutate_v2(rules,mutation_rate,gene_size,rule_size_sqrt):
@@ -180,8 +186,8 @@ if __name__ == '__main__':
     img = Image.open(target_image)
     target = np.asarray(img)[:,:,:dimensions]
 
-    if(os.path.isfile('hand.npy') and start_from_saved_file):
-        population = np.load('hand.npy')
+    if(os.path.isfile('pi.npy') and start_from_saved_file):
+        population = np.load('pi.npy')
     else:
         population = np.zeros((population_size,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
 
@@ -192,6 +198,7 @@ if __name__ == '__main__':
 
     try:
         for i in range(generations):
+            start_time = time.time()
             top = []
             total_fitness = 0
             for j in range(population_size):
@@ -230,9 +237,13 @@ if __name__ == '__main__':
             print("Generation: {}".format(i))
             print("Top fitness: {},  {}".format(new_fitness,np.sqrt(new_fitness)))
 
+            print("Time: {}".format(time.time()-start_time))
+
             if(i==0 or new_fitness<old_fitness):
                 old_fitness = new_fitness
                 writepops.append(decode(population[0],fractal_iterations,seed))
+
+
 
     except KeyboardInterrupt:
         pass
@@ -246,4 +257,4 @@ if __name__ == '__main__':
             writer.grab_frame()
 
     if(save_ruleset):
-        np.save('hand',population)
+        np.save('pi',population)
