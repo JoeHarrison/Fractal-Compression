@@ -1,7 +1,7 @@
 #Imports
 import numpy as np
 import matplotlib
-#matplotlib.use("Agg")
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from PIL import Image
@@ -18,7 +18,6 @@ import time
 # - Crossover on pixel level
 # - Roulette wheel selection!
 # - RGB
-# - Parallelisation of decoding
 # - Hyperparameter tuning
 # - Remove whitespace matplotlib plot
 # - Parallelisation
@@ -32,8 +31,8 @@ import time
 #Hyper parameters
 gene_size = 256
 population_size = 50
-mutation_rate = 0.01
-crossover_rate = 0.01
+mutation_rate = 0.1/5
+crossover_rate = 0.1/5
 generations = 24000
 elites = 2
 randoms = 0
@@ -52,10 +51,9 @@ save_ruleset = True
 #Initalisation of rules
 #Every possible pixel value maps to a random 3x3 grid
 def init_rules():
-    rules = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
-    for i in range(gene_size):
-        rules[i] = np.random.randint(gene_size,size=(dimensions,rule_size_sqrt,rule_size_sqrt))
-    return rules
+
+    return np.random.randint(gene_size,size=(gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+
 
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
@@ -142,10 +140,12 @@ def crossover_v2(rules1,rules2,crossover_rate):
 def crossover(rules1,rules2,crossover_rate):
     crossover_rules1 = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
     crossover_rules2 = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+
+    rand_var = np.random.choice([0,1],size=(gene_size,dimensions),p=[1-crossover_rate,crossover_rate])
+
     for i in range(gene_size):
         for j in range(dimensions):
-            randi = np.random.choice([0,1],p=[1-crossover_rate,crossover_rate])
-            if(randi):
+            if(rand_var[i,j]):
                 crossover_rules1[i,j] = rules2[i,j]
                 crossover_rules2[i,j] = rules1[i,j]
             else:
@@ -262,9 +262,11 @@ if __name__ == '__main__':
         total_frames = len(writepops)
         for idx, wrtpop in enumerate(writepops):
             print("{}/{}".format(idx,total_frames))
-
             plt.imshow(wrtpop.astype('uint8'),interpolation='nearest')
             writer.grab_frame()
+
+        if(total_frames>100):
+            os.system('say "boop ti boop"')
 
     if(save_ruleset):
         np.save('pi',population)
