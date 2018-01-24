@@ -32,10 +32,10 @@ import time
 #Hyper parameters
 gene_size = 256
 population_size = 50
-mutation_rate = 0.1
-crossover_rate = 0.1
+mutation_rate = 0.01
+crossover_rate = 0.01
 generations = 24000
-elites = 4
+elites = 2
 randoms = 0
 
 fractal_iterations = 6
@@ -59,7 +59,7 @@ def init_rules():
 
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
-def decode(rules,fractal_iterations,seed):
+def decode_old(rules,fractal_iterations,seed):
     final_seed_matrix = np.zeros((3,3**fractal_iterations,3**fractal_iterations))
 
     for i in range(dimensions):
@@ -79,6 +79,19 @@ def decode(rules,fractal_iterations,seed):
 
     return np.moveaxis(final_seed_matrix,0,-1)
 
+def decode(rules, fractal_iterations, seed):
+    rules_int = rules.astype(int)
+    seed = np.array([[seed]], dtype=int)
+    res = np.empty((3**fractal_iterations, 3**fractal_iterations, dimensions),
+                   dtype=rules.dtype)
+    for i in range(dimensions):
+        grow = seed
+        for j in range(1, fractal_iterations):
+            grow = rules_int[grow, i].swapaxes(1, 2).reshape(3**j, -1)
+        grow = rules[grow, i].swapaxes(1, 2).reshape(3**fractal_iterations, -1)
+        res[..., i] = grow
+    return res
+
 #The the sum of the pixel-wise absolute differences between the target image and the image created using the rule set is used as fitness measure. A sum of 0 means that the target image could be recreated from the rule set without loss. The largest possible difference is the gene size x height x width of the image.
 def fitness(target_image,genetic_image):
     penalty = 0
@@ -97,7 +110,6 @@ def mutate(rules,mutation_rate,gene_size,rule_size_sqrt):
     #     random_matrix = np.random.choice([-1,0,1],(dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
     #     mutated_rules[i] = np.clip(rules[i] + random_matrix,a_min=0,a_max=255)
     # return mutated_rules
-
     random_matrix = np.random.choice([-1,0,1],(gene_size,dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
 
     return np.clip(rules + random_matrix,a_min=0,a_max=255)
@@ -242,8 +254,6 @@ if __name__ == '__main__':
             if(i==0 or new_fitness<old_fitness):
                 old_fitness = new_fitness
                 writepops.append(decode(population[0],fractal_iterations,seed))
-
-
 
     except KeyboardInterrupt:
         pass
