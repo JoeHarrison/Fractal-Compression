@@ -47,9 +47,8 @@ save_ruleset = True
 
 #Initalisation of rules
 #Every possible pixel value maps to a random 3x3 grid
-def init_rules():
-    return np.random.randint(gene_size,size=(gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
-
+def init_rules(number_of_rules):
+    return np.random.randint(gene_size,size=(number_of_rules,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
 
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
@@ -205,10 +204,7 @@ if __name__ == '__main__':
             additional_population = np.zeros((population_size-population.shape[0],gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
             population = np.concatenate((population,additional_population),axis=0)
     else:
-        population = np.zeros((population_size,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
-
-        for i in range(population_size):
-            population[i] = init_rules()
+        population = init_rules(population_size)
 
     writepops = []
 
@@ -246,8 +242,7 @@ if __name__ == '__main__':
                 if(j+1 < population_size):
                     population[j], population[j+1] = crossover(old_population[random_indices[0]],old_population[random_indices[1]],crossover_rate)
 
-            for j in range(population_size - randoms,population_size):
-                population[j] = init_rules()
+            population[population_size - randoms:population_size] = init_rules(randoms)
 
             new_fitness = top_sorted[0][0]
 
