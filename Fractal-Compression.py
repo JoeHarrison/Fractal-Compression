@@ -15,26 +15,23 @@ import time
 # - vary seed in genes
 # - Allow for gene of different size?
 # - non-random initalisation
-# - Crossover on pixel level
 # - Roulette wheel selection!
-# - RGB
+# - Linear ranking
 # - Hyperparameter tuning
 # - Remove whitespace matplotlib plot
 # - Parallelisation
 # - Loss per Generation Graph
-# - Save state
 # - Comments
-# - Elitism
 # - Make functions from main
-# - Speed up decoder
+# - Decouple colour channels and add together in last stage. Now a positive evolution step can be overshadowed by negative steps in other dimensions
 
 #Hyper parameters
 gene_size = 256
-population_size = 50
-mutation_rate = 0.1/5
-crossover_rate = 0.1/5
+population_size = 10
+mutation_rate = (1/256)/3
+crossover_rate = (1/256)/3
 generations = 24000
-elites = 2
+elites = 1
 randoms = 0
 
 fractal_iterations = 6
@@ -51,7 +48,6 @@ save_ruleset = True
 #Initalisation of rules
 #Every possible pixel value maps to a random 3x3 grid
 def init_rules():
-
     return np.random.randint(gene_size,size=(gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
 
 
@@ -200,6 +196,14 @@ if __name__ == '__main__':
 
     if(os.path.isfile('pi.npy') and start_from_saved_file):
         population = np.load('pi.npy')
+
+        #Remove part of population if current size of population is smaller than saved file
+        if(population.shape[0]>population_size):
+            population = population[:population_size]
+        #Add new rules to population if current population is larger than saved file
+        elif(population.shape[0]<population_size):
+            additional_population = np.zeros((population_size-population.shape[0],gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+            population = np.concatenate((population,additional_population),axis=0)
     else:
         population = np.zeros((population_size,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
 
@@ -239,7 +243,8 @@ if __name__ == '__main__':
 
             for j in range(elites,population_size - randoms,2):
                 random_indices = np.random.choice(population_size,2,odds)
-                population[j], population[j+1] = crossover(old_population[random_indices[0]],old_population[random_indices[1]],crossover_rate)
+                if(j+1 < population_size):
+                    population[j], population[j+1] = crossover(old_population[random_indices[0]],old_population[random_indices[1]],crossover_rate)
 
             for j in range(population_size - randoms,population_size):
                 population[j] = init_rules()
@@ -266,7 +271,7 @@ if __name__ == '__main__':
             writer.grab_frame()
 
         if(total_frames>100):
-            os.system('say "boop ti boop"')
+            os.system('say "The ting goes skrrrahh (ah) Pap, pap, ka-ka-ka (ka) Skidiki-pap-pap (pap) And a pu-pu-pudrrrr-boom (boom) Skya (ah) Du-du-ku-ku-dun-dun (dun) Poom, poom You don\' know"')
 
     if(save_ruleset):
         np.save('pi',population)
