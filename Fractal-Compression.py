@@ -9,7 +9,6 @@ import os.path
 import os
 import time
 
-
 #TODO
 # - vary gene_size / turn on off genes
 # - vary seed in genes
@@ -24,23 +23,27 @@ import time
 # - Comments
 # - Make functions from main
 # - Decouple colour channels and add together in last stage. Now a positive evolution step can be overshadowed by negative steps in other dimensions
+# - Wrap around instead of clamping
+# - Mapping with smaller gene_size!!!
+# - Fractal zoom function
+# - Speedup animation
 
 #Hyper parameters
 gene_size = 256
-population_size = 10
-mutation_rate = (1/256)/3
-crossover_rate = (1/256)/3
+population_size = 100
+mutation_rate = 0.01
+crossover_rate = 0.01
 generations = 24000
 elites = 1
-randoms = 0
+randoms = 1
 
-fractal_iterations = 6
+fractal_iterations = 2
 rule_size_sqrt = 3
 dimensions = 3
-seed = 100
+seed = 128
 
-target_image = './Images/pi.png'
-video_file = 'pi.mp4'
+target_image = './Images/small.png'
+video_file = 'small.mp4'
 
 start_from_saved_file = True
 save_ruleset = True
@@ -48,7 +51,11 @@ save_ruleset = True
 #Initalisation of rules
 #Every possible pixel value maps to a random 3x3 grid
 def init_rules(number_of_rules):
+    #return 255*np.ones((number_of_rules,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
     return np.random.randint(gene_size,size=(number_of_rules,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+
+def non_random_init_rules(number_of_rules):
+    return 255*np.ones((number_of_rules,gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
 
 #Decodes rule set into image
 #An image is grown from a seed pixel value with the provided rule set
@@ -97,15 +104,15 @@ def fitness(target_image,genetic_image):
 
 #Each pixel is mutated with a mutation_rate/2 chance.
 #The range is clipped to a minimum of 0 and a maximum of gene size.
-def mutate(rules,mutation_rate,gene_size,rule_size_sqrt):
-    # mutated_rules = np.zeros((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
-    # for i in range(gene_size):
-    #     random_matrix = np.random.choice([-1,0,1],(dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
-    #     mutated_rules[i] = np.clip(rules[i] + random_matrix,a_min=0,a_max=255)
-    # return mutated_rules
+def mutate_clip(rules,mutation_rate,gene_size,rule_size_sqrt):
     random_matrix = np.random.choice([-1,0,1],(gene_size,dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
-
     return np.clip(rules + random_matrix,a_min=0,a_max=255)
+
+#Each pixel is mutated with a mutation_rate/2 chance.
+#The range wraps around
+def mutate_mod(rules,mutation_rate,gene_size,rule_size_sqrt):
+    random_matrix = np.random.choice([-1,0,1],(gene_size,dimensions,rule_size_sqrt,rule_size_sqrt),[mutation_rate/2,1-mutation_rate,mutation_rate/2])
+    return np.mod(rules + random_matrix,256*np.ones((gene_size,dimensions,rule_size_sqrt,rule_size_sqrt)))
 
 #Each pixel is mutated with a random value between 0 and 255
 def mutate_v2(rules,mutation_rate,gene_size,rule_size_sqrt):
@@ -182,6 +189,29 @@ def write_rules(file_name,rules,seed,gene_size,dimensions):
                             f.write(str(int(rules[j,i,k,l])) + ' ')
                     f.write('\n')
 
+def init_population():
+    if(os.path.isfile('small.npy') and start_from_saved_file):
+        population = np.load('small.npy')
+
+        #Remove part of population if current size of population is smaller than saved file
+        if(population.shape[0]>population_size):
+            population = population[:population_size]
+        #Add new rules to population if current population is larger than saved file
+        elif(population.shape[0]<population_size):
+            additional_population = np.zeros((population_size-population.shape[0],gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
+            population = np.concatenate((population,additional_population),axis=0)
+    else:
+        population = init_rules(population_size)
+
+    return population
+
+def linear_ranking(mu,i,s=1.5):
+    i = mu - i - 1
+    return (2-s)/mu + 2*i*(s-1)/(mu*(mu-1))
+
+def proportional_ranking(fitness,total):
+    return fitness/total
+
 if __name__ == '__main__':
     FFMpegWriter = animation.writers['ffmpeg']
     metadata = dict(title='Fractal-Compression')
@@ -193,18 +223,7 @@ if __name__ == '__main__':
     img = Image.open(target_image)
     target = np.asarray(img)[:,:,:dimensions]
 
-    if(os.path.isfile('pi.npy') and start_from_saved_file):
-        population = np.load('pi.npy')
-
-        #Remove part of population if current size of population is smaller than saved file
-        if(population.shape[0]>population_size):
-            population = population[:population_size]
-        #Add new rules to population if current population is larger than saved file
-        elif(population.shape[0]<population_size):
-            additional_population = np.zeros((population_size-population.shape[0],gene_size,dimensions,rule_size_sqrt,rule_size_sqrt))
-            population = np.concatenate((population,additional_population),axis=0)
-    else:
-        population = init_rules(population_size)
+    population = init_population()
 
     writepops = []
 
@@ -223,7 +242,8 @@ if __name__ == '__main__':
             odds = []
 
             for j in range(population_size):
-                odds.append(top[j][0] / total_fitness)
+                odds.append(linear_ranking(population_size,j,1.5))
+                #odds.append(proportional_ranking(top[j][0],total_fitness))
 
             old_population = population
 
@@ -231,7 +251,7 @@ if __name__ == '__main__':
                 population[j] = population[top_sorted[j][1]]
 
             for j in range(elites,population_size):
-                population[j] = mutate(population[j],mutation_rate,gene_size,rule_size_sqrt)
+                population[j] = mutate_clip(population[j],mutation_rate,gene_size,rule_size_sqrt)
 
             for j in range(elites,population_size):
                random_pop = np.random.choice(population_size,1,odds)
@@ -253,10 +273,14 @@ if __name__ == '__main__':
 
             if(i==0 or new_fitness<old_fitness):
                 old_fitness = new_fitness
-                writepops.append(decode(population[0],fractal_iterations,seed))
-
+                writepops.append(decode(population[0],fractal_iterations+1,seed))
+            if(new_fitness==0):
+                break
     except KeyboardInterrupt:
         pass
+
+    if(save_ruleset):
+        np.save('small',population)
 
     with writer.saving(fig, video_file ,100):
         total_frames = len(writepops)
@@ -266,7 +290,4 @@ if __name__ == '__main__':
             writer.grab_frame()
 
         if(total_frames>100):
-            os.system('say "The ting goes skrrrahh (ah) Pap, pap, ka-ka-ka (ka) Skidiki-pap-pap (pap) And a pu-pu-pudrrrr-boom (boom) Skya (ah) Du-du-ku-ku-dun-dun (dun) Poom, poom You don\' know"')
-
-    if(save_ruleset):
-        np.save('pi',population)
+            os.system('say "Ting"')
